@@ -1,0 +1,34 @@
+{
+  "name": "zodser",
+  "version": "0.0.0",
+  "description": "A simple zod serialiser",
+  "main": "./dest/index.js",
+  "types": "./dest/index.d.ts",
+  "scripts": {
+    "build": "tsc src/*.ts --target es2018 --moduleResolution node --module commonjs --esModuleInterop --declaration --outDir dest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:shaketbaby/zodser.git"
+  },
+  "homepage": "https://github.com/shaketbaby/zodser",
+  "bugs": {
+    "url": "https://github.com/shaketbaby/zodser/issues"
+  },
+  "keywords": [
+    "zod",
+    "serialise",
+    "serialisation"
+  ],
+  "author": "Shaketbaby",
+  "license": "MIT",
+  "volta": {
+    "node": "18.14.0"
+  },
+  "dependencies": {
+    "zod": "^3.20.6"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.1"
+  }
+}
