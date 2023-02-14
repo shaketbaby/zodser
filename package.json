@@ -1,6 +1,6 @@
 {
   "name": "zodser",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A simple zod serialiser",
   "main": "./dest/index.js",
   "types": "./dest/index.d.ts",
