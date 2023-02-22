@@ -41,7 +41,7 @@ export type SupportedZodType =
 export type Ref = { $ref: number };
 
 type BaseDef = {
-  $refTarget?: number;
+  $id?: number;
   description?: string;
   required_error?: string;
   invalid_type_error?: string;

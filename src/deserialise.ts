@@ -16,8 +16,8 @@ export function deserialise(str: string): SupportedZodType {
     const typeDef = typeDefOrRef as TypeDef;
 
     const zodSchema: SupportedZodType = buildInstance();
-    if (typeDef.$refTarget) {
-      refs[typeDef.$refTarget] = zodSchema;
+    if (typeDef.$id) {
+      refs[typeDef.$id] = zodSchema;
     }
     return populateZodDef();
 

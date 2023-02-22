@@ -3,38 +3,45 @@ import type { Ref, SupportedZodType, TypeDef } from './types';
 
 export function serialise(schema: SupportedZodType): string {
   let refSeq = 0;
-  const parentSchema = new Set<SupportedZodType>();
-  const schemaRefs = new Map<SupportedZodType, { $ref: number }>();
-  return JSON.stringify(transform(schema));
+  const schemaRefs = new Map<SupportedZodType, TypeDef>();
+  return JSON.stringify(transform(schema), function(k, v) {
+    if (k === "$id" && v === 0) {
+      return undefined; // remove if no other references
+    }
+    return v;
+  });
 
 
   function transform(schema: SupportedZodType): TypeDef | Ref {
+    let def = schemaRefs.get(schema);
     // return a ref if we have seen this schema
-    let ref = schemaRefs.get(schema);
-    if (!ref) {
-      // init ref if seen for the first time
-      ref = { $ref: 0 };
-      schemaRefs.set(schema, ref);
-    } else {
+    if (def) {
       // bump sequence if this schema is refed the first time
-      if (ref.$ref === 0) {
+      if (def.$id === 0) {
         refSeq++;
-        ref.$ref = refSeq;
+        def.$id = refSeq;
       }
-      return ref; // return a ref only if seen
+      return { $ref: def.$id as number };
     }
 
-    parentSchema.add(schema); // remember the schema
-
+    // convert to type definition json when seen the first time
     const { typeName, description, errorMap } = schema._def;
     const jsonTypeDef = {
+      $id: 0,
       typeName: typeName,
       description: description,
       required_error: getCustomErrorMsg(errorMap),
       invalid_type_error: getCustomErrorMsg(errorMap, 1),
     } as TypeDef;
 
-    switch (schema._def.typeName) {
+    // map schema to the final definition
+    schemaRefs.set(schema, jsonTypeDef);
+
+    return Object.assign(jsonTypeDef, getTypeSpecificDefs(schema._def));
+  }
+
+  function getTypeSpecificDefs(schemaDef: SupportedZodType["_def"]) {
+    switch (schemaDef.typeName) {
       case Z.ZodFirstPartyTypeKind.ZodAny:
       case Z.ZodFirstPartyTypeKind.ZodVoid:
       case Z.ZodFirstPartyTypeKind.ZodNull:
@@ -45,144 +52,107 @@ export function serialise(schema: SupportedZodType): string {
       }
       case Z.ZodFirstPartyTypeKind.ZodNullable:
       case Z.ZodFirstPartyTypeKind.ZodOptional: {
-        Object.assign(jsonTypeDef, {
-          innerType: transform(schema._def.innerType)
-        })
-        break;
+        return {
+          innerType: transform(schemaDef.innerType)
+        };
       }
       case Z.ZodFirstPartyTypeKind.ZodDefault: {
-        Object.assign(jsonTypeDef, {
-          innerType: transform(schema._def.innerType),
-          defaultValue: schema._def.defaultValue()
-        });
-        break;
+        return {
+          innerType: transform(schemaDef.innerType),
+          defaultValue: schemaDef.defaultValue()
+        };
       }
       case Z.ZodFirstPartyTypeKind.ZodString: {
-        Object.assign(jsonTypeDef, {
-          coerce: schema._def.coerce || undefined,
-          checks: schema._def.checks.map(c => c.kind !== 'regex' ? c : {
+        return {
+          coerce: schemaDef.coerce || undefined,
+          checks: schemaDef.checks.map(c => c.kind !== 'regex' ? c : {
             kind: c.kind,
             message: c.message,
             regex: String(c.regex)
           }),
-        });
-        break;
+        };
       }
       case Z.ZodFirstPartyTypeKind.ZodNumber:
       case Z.ZodFirstPartyTypeKind.ZodDate: {
-        Object.assign(jsonTypeDef, {
-          checks: schema._def.checks,
-          coerce: schema._def.coerce || undefined,
-        });
-        break;
+        return {
+          checks: schemaDef.checks,
+          coerce: schemaDef.coerce || undefined,
+        };
       }
       case Z.ZodFirstPartyTypeKind.ZodNaN: {
-        Object.assign(jsonTypeDef, {});
-        break;
+        return {};
       }
       case Z.ZodFirstPartyTypeKind.ZodBigInt:
       case Z.ZodFirstPartyTypeKind.ZodBoolean: {
-        Object.assign(jsonTypeDef, { coerce: schema._def.coerce || undefined });
-        break;
+        return { coerce: schemaDef.coerce || undefined };
       }
       case Z.ZodFirstPartyTypeKind.ZodArray: {
-        Object.assign(jsonTypeDef, {
-          minLength: schema._def.minLength || undefined,
-          maxLength: schema._def.maxLength || undefined,
-          exactLength: schema._def.exactLength || undefined,
-          type: transform(schema._def.type),
-        });
-        break;
+        return {
+          minLength: schemaDef.minLength || undefined,
+          maxLength: schemaDef.maxLength || undefined,
+          exactLength: schemaDef.exactLength || undefined,
+          type: transform(schemaDef.type),
+        };
       }
       case Z.ZodFirstPartyTypeKind.ZodObject: {
-        const _def = schema._def as Z.ZodObjectDef;
-        Object.assign(jsonTypeDef, {
+        const _def = schemaDef as Z.ZodObjectDef;
+        return {
           shape: Object.fromEntries(Object.entries(_def.shape()).map(
             ([key, value]) => [key, transform(value)]
           )),
-          unknownKeys: schema._def.unknownKeys,
-          catchAll: transform(schema._def.catchall),
-        });
-        break;
+          unknownKeys: schemaDef.unknownKeys,
+          catchAll: transform(schemaDef.catchall),
+        };
       }
       case Z.ZodFirstPartyTypeKind.ZodUnion: {
-        const _def = schema._def as Z.ZodUnionDef;
-        Object.assign(jsonTypeDef, {
+        const _def = schemaDef as Z.ZodUnionDef;
+        return {
           options: _def.options.map(op => transform(op))
-        });
-        break;
+        };
       }
       case Z.ZodFirstPartyTypeKind.ZodDiscriminatedUnion: {
-        const _def = schema._def as Z.ZodDiscriminatedUnionDef<string>;
-        Object.assign(jsonTypeDef, {
-          discriminator: _def.discriminator,
-          options: _def.options.map(op => transform(op)),
-        });
-        break;
+        const { discriminator, options } = schemaDef as Z.ZodDiscriminatedUnionDef<string>;
+        return { discriminator, options: options.map(op => transform(op)) };
       }
       case Z.ZodFirstPartyTypeKind.ZodIntersection: {
-        const _def = schema._def as Z.ZodIntersectionDef;
-        Object.assign(jsonTypeDef, {
-          left: transform(_def.left),
-          right: transform(_def.right),
-        });
-        break;
+        const { left, right } = schemaDef;
+        return { left: transform(left), right: transform(right),
+        };
       }
       case Z.ZodFirstPartyTypeKind.ZodTuple: {
-        const _def = schema._def as Z.ZodTupleDef;
-        Object.assign(jsonTypeDef, {
-          items: _def.items.map(i => transform(i)),
-          rest: _def.rest ? transform(_def.rest) : undefined,
-        });
-        break;
+        const { items, rest } = schemaDef as Z.ZodTupleDef;
+        return {
+          items: items.map(i => transform(i)),
+          rest: rest ? transform(rest) : undefined,
+        };
       }
-      case Z.ZodFirstPartyTypeKind.ZodRecord: {
-        const _def = schema._def as Z.ZodRecordDef;
-        Object.assign(jsonTypeDef, {
-          keyType: transform(_def.keyType),
-          valueType: transform(_def.valueType),
-        });
-        break;
-      }
+      case Z.ZodFirstPartyTypeKind.ZodRecord:
       case Z.ZodFirstPartyTypeKind.ZodMap: {
-        const _def = schema._def as Z.ZodMapDef;
-        Object.assign(jsonTypeDef, {
-          keyType: transform(_def.keyType),
-          valueType: transform(_def.valueType),
-        });
-        break;
+        const { keyType, valueType } = schemaDef;
+        return {
+          keyType: transform(keyType),
+          valueType: transform(valueType),
+        };
       }
       case Z.ZodFirstPartyTypeKind.ZodSet: {
-        const _def = schema._def as Z.ZodSetDef;
-        Object.assign(jsonTypeDef, {
-          valueType: transform(_def.valueType),
-          minSize: _def.minSize || undefined,
-          maxSize: _def.maxSize || undefined,
-        });
-        break;
+        const { valueType, minSize, maxSize } = schemaDef;
+        return {
+          valueType: transform(valueType),
+          minSize: minSize || undefined,
+          maxSize: maxSize || undefined,
+        };
       }
       case Z.ZodFirstPartyTypeKind.ZodLiteral: {
-        Object.assign(jsonTypeDef, { value: schema._def.value });
-        break;
+        return { value: schemaDef.value };
       }
       case Z.ZodFirstPartyTypeKind.ZodEnum:
       case Z.ZodFirstPartyTypeKind.ZodNativeEnum: {
-        Object.assign(jsonTypeDef, { values: schema._def.values });
-        break;
+        return { values: schemaDef.values };
       }
       default: {
         throw new Error("Unsupported schema");
       }
     }
-
-    parentSchema.delete(schema);
-
-    // mark as target if this schema is refed
-    if (ref.$ref !== 0) {
-      jsonTypeDef.$refTarget = ref.$ref;
-    }
-
-    return jsonTypeDef;
   }
 }
 
