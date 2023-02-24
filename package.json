@@ -5,6 +5,8 @@
   "main": "./dest/index.js",
   "types": "./dest/index.d.ts",
   "scripts": {
+    "to-release": "npm run release [<newversion> | major | minor | patch]",
+    "release": "npm run build && npm version",
     "build": "tsc src/*.ts --target es2018 --moduleResolution node --module commonjs --esModuleInterop --declaration --outDir dest"
   },
   "repository": {
@@ -25,7 +27,7 @@
   "volta": {
     "node": "18.14.0"
   },
-  "dependencies": {
+  "peerDependencies": {
     "zod": "^3.20.6"
   },
   "devDependencies": {
