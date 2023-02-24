@@ -4,20 +4,16 @@ import type { Ref, SupportedZodType, TypeDef } from './types';
 export function serialise(schema: SupportedZodType): string {
   let refSeq = 0;
   const schemaRefs = new Map<SupportedZodType, TypeDef>();
-  return JSON.stringify(transform(schema), function(k, v) {
-    if (k === "$id" && v === 0) {
-      return undefined; // remove if no other references
-    }
-    return v;
-  });
+  return JSON.stringify(transform(schema));
 
 
   function transform(schema: SupportedZodType): TypeDef | Ref {
     let def = schemaRefs.get(schema);
     // return a ref if we have seen this schema
     if (def) {
-      // bump sequence if this schema is refed the first time
-      if (def.$id === 0) {
+      // bump sequence and assign a uniq id to the definition
+      // if this schema is referenced for the first time
+      if (!def.$id) {
         refSeq++;
         def.$id = refSeq;
       }
@@ -27,7 +23,6 @@ export function serialise(schema: SupportedZodType): string {
     // convert to type definition json when seen the first time
     const { typeName, description, errorMap } = schema._def;
     const jsonTypeDef = {
-      $id: 0,
       typeName: typeName,
       description: description,
       required_error: getCustomErrorMsg(errorMap),
