@@ -1,4 +1,4 @@
-import Z from 'zod';
+import Z, { ZodTuple } from 'zod';
 import type { ScalarDef, TypeDef, WrapperDef, DefaultDef, SupportedZodType, Ref } from './types';
 
 type MultipleZodTypes = [Z.ZodTypeAny, Z.ZodTypeAny];
@@ -19,6 +19,7 @@ export function deserialise(str: string): SupportedZodType {
     if (typeDef.$id) {
       refs[typeDef.$id] = zodSchema;
     }
+
     return populateZodDef();
 
 
@@ -87,6 +88,9 @@ export function deserialise(str: string): SupportedZodType {
         case Z.ZodFirstPartyTypeKind.ZodIntersection: {
           return Z.intersection(dummyType, dummyType, params);
         }
+        case Z.ZodFirstPartyTypeKind.ZodPipeline: {
+          return Z.pipeline(dummyType, dummyType);
+        }
         case Z.ZodFirstPartyTypeKind.ZodTuple: {
           return Z.tuple([], params);
         }
@@ -100,13 +104,28 @@ export function deserialise(str: string): SupportedZodType {
           return Z.set(dummyType, params);
         }
         case Z.ZodFirstPartyTypeKind.ZodLiteral: {
-          return Z.literal(1);
+          return Z.literal(1, params);
         }
         case Z.ZodFirstPartyTypeKind.ZodEnum: {
-          return Z.enum(['enum']);
+          return Z.enum(['enum'], params);
         }
         case Z.ZodFirstPartyTypeKind.ZodNativeEnum: {
-          return Z.nativeEnum({});
+          return Z.nativeEnum({}, params);
+        }
+        case Z.ZodFirstPartyTypeKind.ZodFunction: {
+          return Z.function(Z.tuple([]), dummyType, params);
+        }
+        case Z.ZodFirstPartyTypeKind.ZodLazy: {
+          return Z.lazy(() => dummyType, params);
+        }
+        case Z.ZodFirstPartyTypeKind.ZodBranded: {
+          return dummyType.brand();
+        }
+        case Z.ZodFirstPartyTypeKind.ZodPromise: {
+          return Z.promise(dummyType, params);
+        }
+        case Z.ZodFirstPartyTypeKind.ZodCatch: {
+          return dummyType.catch({ key: "" });
         }
         default: {
           throw new Error("Unsupported schema");
@@ -150,7 +169,7 @@ export function deserialise(str: string): SupportedZodType {
             const [_, pattern, flags] = String(regex).split("/");
             return new RegExp(pattern, flags);
           }
-          Object.assign(zodSchema._def, {
+          Object.assign(zodDef, {
             coerce: coerce || false,
             checks: strChecks.map(c => c.kind !== 'regex' ? c : {
               ...c, regex: toRegExp(String(c.regex))
@@ -225,6 +244,13 @@ export function deserialise(str: string): SupportedZodType {
           });
           break;
         }
+        case Z.ZodFirstPartyTypeKind.ZodPipeline: {
+          Object.assign(zodDef, {
+            in: rebuild(typeDef.left),
+            out: rebuild(typeDef.right),
+          });
+          break;
+        }
         case Z.ZodFirstPartyTypeKind.ZodTuple: {
           const { items, rest } = typeDef;
           Object.assign(zodDef, {
@@ -259,6 +285,27 @@ export function deserialise(str: string): SupportedZodType {
         }
         case Z.ZodFirstPartyTypeKind.ZodNativeEnum: {
           (zodDef as Z.ZodNativeEnumDef).values = typeDef.values;
+          break;
+        }
+        case Z.ZodFirstPartyTypeKind.ZodFunction: {
+          const fnDef = zodDef as Z.ZodFunctionDef;
+          fnDef.args = rebuild(typeDef.args) as ZodTuple;
+          fnDef.returns = rebuild(typeDef.returns);
+          break;
+        }
+        case Z.ZodFirstPartyTypeKind.ZodLazy: {
+          const inner = rebuild(typeDef.innerType);
+          (zodDef as Z.ZodLazyDef).getter = () => inner;
+          break;
+        }
+        case Z.ZodFirstPartyTypeKind.ZodBranded:
+        case Z.ZodFirstPartyTypeKind.ZodPromise: {
+          (zodDef as Z.ZodPromiseDef).type = rebuild(typeDef.innerType);
+          break;
+        }
+        case Z.ZodFirstPartyTypeKind.ZodCatch: {
+          (zodDef as Z.ZodCatchDef).innerType = rebuild(typeDef.innerType);
+          (zodDef as Z.ZodCatchDef).catchValue = () => typeDef.value;
           break;
         }
       }

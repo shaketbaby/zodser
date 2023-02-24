@@ -28,13 +28,13 @@ export type SupportedZodType =
   | Z.ZodOptional<any>
   | Z.ZodNullable<any>
   | Z.ZodDefault<any>
-  // | Z.ZodFunction<any, any>
-  // | Z.ZodLazy<any>
+  | Z.ZodFunction<any, any>
+  | Z.ZodLazy<any>
+  | Z.ZodCatch<any>
+  | Z.ZodPromise<any>
+  | Z.ZodBranded<any, any>
+  | Z.ZodPipeline<any, any>
   // | Z.ZodEffects<any, any, any>
-  // | Z.ZodCatch<any>
-  // | Z.ZodPromise<any>
-  // | Z.ZodBranded<any, any>
-  // | Z.ZodPipeline<any, any>
   ;
 
 // special ref to deal with circular ref
@@ -71,6 +71,9 @@ export type ScalarDef = BaseDef & {
 
 export type WrapperDef = BaseDef & {
   typeName:
+    | Z.ZodFirstPartyTypeKind.ZodLazy
+    | Z.ZodFirstPartyTypeKind.ZodBranded
+    | Z.ZodFirstPartyTypeKind.ZodPromise
     | Z.ZodFirstPartyTypeKind.ZodNullable
     | Z.ZodFirstPartyTypeKind.ZodOptional;
   innerType: TypeDef;
@@ -103,13 +106,17 @@ export type DiscriminatedUnionDef = BaseDef & {
 };
 
 export type IntersectionDef = BaseDef & {
-  typeName: Z.ZodFirstPartyTypeKind.ZodIntersection;
+  typeName:
+    | Z.ZodFirstPartyTypeKind.ZodPipeline
+    | Z.ZodFirstPartyTypeKind.ZodIntersection;
   left: TypeDef;
   right: TypeDef;
 };
 
 export type RecordDef = BaseDef & {
-  typeName: Z.ZodFirstPartyTypeKind.ZodRecord | Z.ZodFirstPartyTypeKind.ZodMap;
+  typeName:
+    | Z.ZodFirstPartyTypeKind.ZodMap
+    | Z.ZodFirstPartyTypeKind.ZodRecord;
   keyType: TypeDef;
   valueType: TypeDef;
 };
@@ -148,6 +155,18 @@ export type DefaultDef = BaseDef & {
   defaultValue: ReturnType<Z.ZodDefaultDef["defaultValue"]>;
 };
 
+export type FunctionDef = BaseDef & {
+  typeName: Z.ZodFirstPartyTypeKind.ZodFunction;
+  args: TupleDef;
+  returns: TypeDef;
+};
+
+export type CatchDef = BaseDef & {
+  typeName: Z.ZodFirstPartyTypeKind.ZodCatch;
+  innerType: TypeDef;
+  value: unknown;
+};
+
 export type TypeDef =
   | SimpleDef
   | ScalarDef
@@ -164,4 +183,6 @@ export type TypeDef =
   | LiteralDef
   | EnumDef
   | NativeEnumDef
+  | FunctionDef
+  | CatchDef
   ;

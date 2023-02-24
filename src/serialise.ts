@@ -50,6 +50,17 @@ export function serialise(schema: SupportedZodType): string {
       case Z.ZodFirstPartyTypeKind.ZodUndefined: {
         break;
       }
+      case Z.ZodFirstPartyTypeKind.ZodLazy: {
+        return {
+          innerType: transform(schemaDef.getter())
+        };
+      }
+      case Z.ZodFirstPartyTypeKind.ZodBranded:
+      case Z.ZodFirstPartyTypeKind.ZodPromise: {
+        return {
+          innerType: transform(schemaDef.type)
+        };
+      }
       case Z.ZodFirstPartyTypeKind.ZodNullable:
       case Z.ZodFirstPartyTypeKind.ZodOptional: {
         return {
@@ -104,6 +115,13 @@ export function serialise(schema: SupportedZodType): string {
           catchAll: transform(schemaDef.catchall),
         };
       }
+      case Z.ZodFirstPartyTypeKind.ZodTuple: {
+        const { items, rest } = schemaDef as Z.ZodTupleDef;
+        return {
+          items: items.map(i => transform(i)),
+          rest: rest ? transform(rest) : undefined,
+        };
+      }
       case Z.ZodFirstPartyTypeKind.ZodUnion: {
         const _def = schemaDef as Z.ZodUnionDef;
         return {
@@ -115,15 +133,15 @@ export function serialise(schema: SupportedZodType): string {
         return { discriminator, options: options.map(op => transform(op)) };
       }
       case Z.ZodFirstPartyTypeKind.ZodIntersection: {
-        const { left, right } = schemaDef;
-        return { left: transform(left), right: transform(right),
+        return {
+          left: transform(schemaDef.left),
+          right: transform(schemaDef.right),
         };
       }
-      case Z.ZodFirstPartyTypeKind.ZodTuple: {
-        const { items, rest } = schemaDef as Z.ZodTupleDef;
+      case Z.ZodFirstPartyTypeKind.ZodPipeline: {
         return {
-          items: items.map(i => transform(i)),
-          rest: rest ? transform(rest) : undefined,
+          left: transform(schemaDef.in),
+          right: transform(schemaDef.out),
         };
       }
       case Z.ZodFirstPartyTypeKind.ZodRecord:
@@ -148,6 +166,18 @@ export function serialise(schema: SupportedZodType): string {
       case Z.ZodFirstPartyTypeKind.ZodEnum:
       case Z.ZodFirstPartyTypeKind.ZodNativeEnum: {
         return { values: schemaDef.values };
+      }
+      case Z.ZodFirstPartyTypeKind.ZodFunction: {
+        return {
+          args: transform(schemaDef.args),
+          returns: transform(schemaDef.returns)
+        };
+      }
+      case Z.ZodFirstPartyTypeKind.ZodCatch: {
+        return {
+          innerType: transform(schemaDef.innerType),
+          value: schemaDef.catchValue()
+        };
       }
       default: {
         throw new Error("Unsupported schema");
