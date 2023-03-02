@@ -32,34 +32,23 @@ const zodSchema = deserialise(schemaString);
 
 ## limitations
 
-Currently, only following zod types are supported
+Currently, all built-in Zod types except ZodEffect are supported with below known limitations
 
-```
-ZodString
-ZodNumber
-ZodNaN
-ZodBigInt
-ZodBoolean
-ZodDate
-ZodUndefined
-ZodNull
-ZodAny
-ZodUnknown
-ZodNever
-ZodVoid
-ZodArray
-ZodObject
-ZodUnion
-ZodDiscriminatedUnion
-ZodIntersection
-ZodTuple
-ZodRecord
-ZodMap
-ZodSet
-ZodLiteral
-ZodEnum
-ZodNativeEnum
-ZodOptional
-ZodNullable
-ZodDefault
+### ZodCatch
+
+Only constant catch value is supported
+```js
+// constant value is supported
+z.string().catch("fallback");
+
+// catch function that returns a constant value is supported
+z.string().catch(() => "fallback");
+
+// this is also okay
+const s = "fallback";
+z.string().catch(() => s);
+
+// this is not supported, because a different Date will be returned for each call; in this example, timestamp of when serialisation runs will be captured and is used as the catch value after deserialisation
+z.date().catch(() => new Date());
+
 ```
