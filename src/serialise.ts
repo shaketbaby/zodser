@@ -1,10 +1,11 @@
 import Z from 'zod';
+import { stringify } from './utils';
 import type { Ref, SupportedZodType, TypeDef } from './types';
 
 export function serialise(schema: SupportedZodType): string {
   let refSeq = 0;
   const schemaRefs = new Map<SupportedZodType, TypeDef>();
-  return JSON.stringify(transform(schema));
+  return stringify(transform(schema));
 
 
   function transform(schema: SupportedZodType): TypeDef | Ref {

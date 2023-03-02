@@ -1,11 +1,12 @@
 import Z, { ZodTuple } from 'zod';
+import { parseJson } from './utils';
 import type { ScalarDef, TypeDef, WrapperDef, DefaultDef, SupportedZodType, Ref } from './types';
 
 type MultipleZodTypes = [Z.ZodTypeAny, Z.ZodTypeAny];
 
 export function deserialise(str: string): SupportedZodType {
   const refs = {} as Record<number, SupportedZodType>;
-  return rebuild(JSON.parse(str));
+  return rebuild(parseJson(str));
 
   function rebuild(typeDefOrRef: TypeDef | Ref): SupportedZodType {
 
